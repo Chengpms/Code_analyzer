@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Architect | Hybrid Edition</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body { background-color: #020617; color: #cbd5e1; overflow: hidden; font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        .font-mono { font-family: 'Fira Code', monospace; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .resizable-panel { resize: horizontal; overflow: hidden; min-width: 300px; max-width: 600px; }
+        
+        .ai-glow { box-shadow: 0 0 15px 0px rgba(99, 102, 241, 0.5); }
+        .ai-scanning {
+            background: linear-gradient(to bottom, transparent, rgba(99, 102, 241, 0.2), transparent);
+            background-size: 100% 200%;
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan { 0% { background-position: 0% -100%; } 100% { background-position: 0% 200%; } }
+
+        .node-active { animation: pulse-ring 2s infinite; }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+        .line-animated { stroke-dasharray: 6; animation: dash 15s linear infinite; }
+        @keyframes dash { to { stroke-dashoffset: -1000; } }
+
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-panel { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        
+        textarea { scroll-behavior: smooth; }
+
+        @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .toast-enter { animation: toast-in 0.25s ease-out; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+    <div id="root" class="h-full w-full"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        // --- ICONOS DINÁMICOS ---
+        const Icons = {
+            Play: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>,
+            Pause: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>,
+            SkipBack: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>,
+            SkipForward: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>,
+            Code: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>,
+            Box: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>,
+            Sparkles: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>,
+            Settings: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
+            Upload: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>,
+            Plus: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+            X: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+            Activity: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>,
+            Info: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>,
+            AlertTriangle: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>,
+            Maximize: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>,
+            Zap: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
+            Cpu: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>,
+            Database: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>,
+            Cloud: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>,
+            Server: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>,
+            Check: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+            Refresh: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>,
+            Palette: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.062 0-.874.726-1.625 1.625-1.625H16c3.375 0 6-2.625 6-6 0-4.875-4.5-8.5-10-8.5z"></path></svg>
+        };
+
+        // --- CLASIFICACIÓN SEMÁNTICA DE NODOS ---
+        // Solo metadatos fijos (etiqueta e icono). El color es configurable por el usuario (ver PALETA).
+        const NODE_TYPES = {
+            class: { label: 'Clases / Structs', icon: 'Box' },
+            function: { label: 'Funciones / Métodos', icon: 'Code' },
+            control: { label: 'Control / Bucles', icon: 'Zap' },
+            io: { label: 'I/O / Hardware', icon: 'Cpu' },
+            variable: { label: 'Variables / Estado', icon: 'Database' }
+        };
+
+        // --- PALETA DE COLORES POR DEFECTO (editable desde Ajustes > Colores) ---
+        const DEFAULT_PALETTE = {
+            class: '#3b82f6',     // azul
+            function: '#10b981',  // esmeralda
+            control: '#f97316',   // naranja
+            io: '#a855f7',        // púrpura
+            variable: '#ec4899'   // rosa
+        };
+
+        // --- HELPERS DE COLOR (hex -> rgba / mezcla con blanco para texto legible) ---
+        const hexToRgbArr = (hex) => {
+            const clean = (hex || '#64748b').replace('#', '');
+            const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+            const num = parseInt(full, 16);
+            if (Number.isNaN(num)) return [100, 116, 139];
+            return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+        };
+        const rgba = (hex, alpha) => {
+            const [r, g, b] = hexToRgbArr(hex);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        };
+        const lighten = (hex, amt) => {
+            const [r, g, b] = hexToRgbArr(hex);
+            const mix = (c) => Math.round(c + (255 - c) * amt);
+            return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+        };
+        // Devuelve el set de estilos inline equivalentes al theming anterior (bg-*-950/80, border-*-500/50, text-*-200)
+        const getNodeTheme = (type, palette) => {
+            const hex = (palette && palette[type]) || DEFAULT_PALETTE[type] || '#64748b';
+            return {
+                hex,
+                background: rgba(hex, 0.22),
+                border: rgba(hex, 0.55),
+                text: lighten(hex, 0.55),
+                glow: `0 0 15px ${rgba(hex, 0.25)}`,
+                glowActive: `0 0 18px ${rgba(hex, 0.45)}`,
+                dot: rgba(hex, 0.6)
+            };
+        };
+
+        const INITIAL_FILES = [
+            {
+                name: "main.cpp",
+                content: `#include <iostream>\n\nclass System {\npublic:\n    void init() {\n        std::cout << "Inicializando subsistemas..." << std::endl;\n    }\n};\n\nint main() {\n    System sys;\n    for(int i=0; i<3; i++) {\n        sys.init();\n    }\n    return 0;\n}`
+            }
+        ];
+
+        // ==============================================================
+        // PROMPT DE ARQUITECTURA
+        // ==============================================================
+        const buildArchitecturePrompt = (combinedCode) => `Eres un Arquitecto de Software Senior y mentor experto en enseñar código complejo a otros desarrolladores. Tu objetivo es analizar el código proporcionado y extraer su arquitectura principal y flujo lógico, de forma que un desarrollador entienda tanto la "foto general" como el funcionamiento técnico de cada pieza clave, SIN necesidad de leer el código fuente.
+
+REGLA CRÍTICA DE NIVEL DE DETALLE:
+Prioriza el ALTO NIVEL. IGNORA el flujo de control menor (condicionales simples, validaciones triviales, getters/setters, bucles de recorrido simple) a menos que representen el motor principal del programa (ej. un event loop, un worker thread central, una máquina de estados). Si tienes duda sobre si un elemento es relevante, pregúntate: "¿Un nuevo miembro del equipo necesita saber esto en su primer día para entender el sistema?". Si la respuesta es no, omítelo.
+
+LÍMITE DE COMPLEJIDAD: Genera como máximo 25 nodos. Si el código es muy extenso, agrupa componentes relacionados en un único nodo (ej. "Módulo de validación de inputs") en lugar de crear uno por función.
+
+Crea nodos EXCLUSIVAMENTE para estos 5 tipos:
+1. "class" — Clases, structs o módulos. Define su rol en el dominio.
+2. "function" — Funciones o métodos clave. Explica su algoritmo principal, no su sintaxis.
+3. "io" — Operaciones de I/O, hardware, red o APIs externas. Detalla la interfaz física o de red (protocolo, formato de datos, dirección del flujo).
+4. "variable" — Variables globales, estado compartido o configuración persistente. Qué almacenan y por qué importan para el resto del sistema.
+5. "control" — Bucles principales/infinitos o máquinas de estado que gobiernan el ciclo de vida del programa.
+
+REGLAS DE SALIDA (MUY IMPORTANTE):
+- Responde ÚNICAMENTE con el JSON, sin texto antes ni después, sin explicaciones, sin bloques de markdown (nada de \`\`\`json).
+- El JSON debe ser válido y parseable: SIN comentarios, SIN comas finales (trailing commas), todas las claves y strings entre comillas dobles.
+- Todos los "from"/"to" en "edges" y "nodeId" en "flow" deben corresponder exactamente a un "id" existente en "nodes". No inventes referencias.
+- Si el código abarca varios archivos, usa el campo "file" para dejarlo explícito en cada nodo.
+- Escribe todo el contenido textual (summary, purpose, labels, explanations) en español.
+
+Estructura exacta a devolver:
+{
+  "summary": "Resumen didáctico y completo (3-4 líneas): objetivo del código, patrón arquitectónico principal (ej. productor-consumidor, MVC, singleton) y qué problema de negocio o técnico resuelve.",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "class",
+      "label": "Nombre exacto del componente tal como aparece en el código",
+      "purpose": "Responsabilidad única del componente y algoritmo o lógica interna clave, explicado en términos entendibles sin leer el código.",
+      "inputs": "Datos concretos, tipos o estados previos que necesita para funcionar",
+      "outputs": "Qué devuelve exactamente, qué estados muta o qué efectos secundarios produce",
+      "lines": [1, 10],
+      "file": "nombre_archivo.cpp",
+      "x": 100,
+      "y": 80
+    }
+  ],
+  "edges": [
+    {
+      "from": "n1",
+      "to": "n2",
+      "label": "Verbo que describe la relación (ej. 'Inicializa', 'Pasa datos a', 'Llama a', 'Escucha eventos de')",
+      "type": "control-flow"
+    }
+  ],
+  "flow": [
+    {
+      "nodeId": "n1",
+      "explanation": "Narrativa del paso: qué hace el sistema en este punto temporal y por qué, justificando el cambio de estado o la llamada siguiente."
+    }
+  ]
+}
+
+Nota sobre "edges[].type": usa "control-flow" cuando un componente invoca o dispara a otro, y "data-flow" cuando un componente únicamente le pasa datos sin controlar su ejecución. Esto se usará para colorear las conexiones en el diagrama.
+
+REGLAS DE DISEÑO DE COORDENADAS (x, y):
+- Organiza los nodos en jerarquía estricta de arriba hacia abajo (Top-Down): nivel 0 (globales/entry point) en y=80, nivel 1 en y=300, nivel 2 en y=520, nivel 3 en y=740, y así incrementando en +220 por cada nivel adicional.
+- Dentro de una misma capa (mismo y), distribuye los nodos horizontalmente centrados alrededor de x=400, con un mínimo de 350px de separación entre centros (ej. con 3 nodos: x=50, x=400, x=750) para evitar solapamiento de textos largos.
+- Si una capa tiene más de 4 nodos, permite continuar el mismo nivel y en filas adicionales desplazadas +150px en y, en lugar de comprimir el espaciado horizontal por debajo de 350px.
+
+CÓDIGO A ANALIZAR:
+${combinedCode}`;
+
+        const estimateTokens = (text) => Math.ceil(text.length / 3.5);
+
+        const sanitizeAIData = (raw) => {
+            const nodes = Array.isArray(raw?.nodes)
+                ? raw.nodes.filter(n => n && typeof n.id === 'string' && typeof n.label === 'string')
+                    .map(n => ({
+                        id: n.id,
+                        type: NODE_TYPES[n.type] ? n.type : 'function',
+                        label: n.label,
+                        purpose: typeof n.purpose === 'string' ? n.purpose : 'Sin descripción disponible.',
+                        inputs: n.inputs ?? '-',
+                        outputs: n.outputs ?? '-',
+                        lines: Array.isArray(n.lines) && n.lines.length === 2 ? n.lines : [1, 1],
+                        file: typeof n.file === 'string' ? n.file : 'Desconocido',
+                        x: typeof n.x === 'number' ? n.x : 100,
+                        y: typeof n.y === 'number' ? n.y : 80,
+                    }))
+                : [];
+
+            const nodeIds = new Set(nodes.map(n => n.id));
+
+            const edges = Array.isArray(raw?.edges)
+                ? raw.edges.filter(e => e && nodeIds.has(e.from) && nodeIds.has(e.to))
+                    .map(e => ({ from: e.from, to: e.to, label: typeof e.label === 'string' ? e.label : '', type: e.type === 'data-flow' ? 'data-flow' : 'control-flow' }))
+                : [];
+
+            const flow = Array.isArray(raw?.flow)
+                ? raw.flow.filter(f => f && nodeIds.has(f.nodeId))
+                    .map(f => ({ nodeId: f.nodeId, explanation: typeof f.explanation === 'string' ? f.explanation : '' }))
+                : [];
+
+            return {
+                summary: typeof raw?.summary === 'string' && raw.summary.trim() ? raw.summary : 'No se recibió un resumen legible del modelo.',
+                nodes, edges, flow,
+            };
+        };
+
+        // PERF: componente memoizado -- solo se vuelve a renderizar si cambian sus props
+        // (node, active, dragging, theme). Así, arrastrar/paneo/edición de texto no fuerza
+        // el re-render de los ~25 nodos del diagrama.
+        const NodeBlock = React.memo(function NodeBlock({ node, active, dragging, theme, onNodeMouseDown, registerRef }) {
+            const IconComponent = Icons[NODE_TYPES[node.type]?.icon] || Icons.Code;
+            const className = `node-block absolute z-10 w-40 p-3 rounded-xl border backdrop-blur-md cursor-pointer select-none${active ? ' node-active' : ''}`;
+            return (
+                <div
+                    ref={(el) => registerRef(node.id, el)}
+                    onMouseDown={(e) => onNodeMouseDown(e, node)}
+                    className={className}
+                    style={{
+                        left: node.x,
+                        top: node.y,
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                        color: theme.text,
+                        boxShadow: active ? `0 0 0 2px #818cf8, ${theme.glowActive}` : theme.glow,
+                        transform: dragging ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'box-shadow 150ms, background-color 150ms, border-color 150ms'
+                    }}
+                >
+                    <div className="flex flex-col items-center justify-center space-y-1">
+                        <div className="opacity-80 mb-1"><IconComponent /></div>
+                        <span className="text-xs font-semibold font-mono truncate w-full text-center">{node.label}</span>
+                    </div>
+                </div>
+            );
+        });
+
+        function App() {
+            // Sistema Multi-Archivo
+            const [files, setFiles] = useState(INITIAL_FILES);
+            const [activeFileId, setActiveFileId] = useState(0);
+
+            // Datos de la IA y Contadores
+            const [data, setData] = useState({ nodes: [], edges: [], flow: [], summary: null });
+            const [sessionRequests, setSessionRequests] = useState(0);
+            
+            // Estado de Visualización
+            const [activeNode, setActiveNode] = useState(null);
+            const [activeFlowExplanation, setActiveFlowExplanation] = useState(null);
+            
+            // Estado del Simulador
+            const [simStep, setSimStep] = useState(-1);
+            const [isPlaying, setIsPlaying] = useState(false);
+            
+            // Navegación del Canvas (Zoom y Pan)
+            const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
+            const viewRef = useRef(view);
+            useEffect(() => { viewRef.current = view; }, [view]);
+            const filesRef = useRef([]);
+            const [isCanvasPanning, setIsCanvasPanning] = useState(false);
+            const [canvasStartPan, setCanvasStartPan] = useState({ x: 0, y: 0 });
+            
+            // --- ESTADOS HÍBRIDOS (Local vs Cloud) ---
+            const [apiMode, setApiMode] = useState(localStorage.getItem('api_mode') || 'local');
+            
+            // Estados Cloud (Gemini)
+            const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+            const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_selected_model') || 'gemini-1.5-flash');
+            const [availableGeminiModels, setAvailableGeminiModels] = useState([]);
+            
+            // Estados Local (Ollama)
+            const [ollamaModel, setOllamaModel] = useState(localStorage.getItem('ollama_model') || 'qwen2.5-coder:7b');
+            const [availableOllamaModels, setAvailableOllamaModels] = useState([]);
+            const [useGpu, setUseGpu] = useState(true);
+            const [ollamaStatus, setOllamaStatus] = useState({ state: 'idle', message: '' });
+
+            // Estado de UI de Ajustes
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [aiStatus, setAiStatus] = useState("Esperando código...");
+            const [aiStatusLevel, setAiStatusLevel] = useState("info");
+            const [showSettings, setShowSettings] = useState(false);
+            const [settingsTab, setSettingsTab] = useState(apiMode);
+            const [newFileModal, setNewFileModal] = useState(false);
+            const [newFileName, setNewFileName] = useState('');
+
+            // --- PALETA DE COLORES (persistida en localStorage) ---
+            const [palette, setPalette] = useState(() => {
+                try {
+                    const saved = JSON.parse(localStorage.getItem('node_palette') || '{}');
+                    return { ...DEFAULT_PALETTE, ...saved };
+                } catch {
+                    return DEFAULT_PALETTE;
+                }
+            });
+            const updatePaletteColor = (type, hex) => {
+                setPalette(prev => {
+                    const next = { ...prev, [type]: hex };
+                    localStorage.setItem('node_palette', JSON.stringify(next));
+                    return next;
+                });
+            };
+            const resetPalette = () => {
+                setPalette(DEFAULT_PALETTE);
+                localStorage.setItem('node_palette', JSON.stringify(DEFAULT_PALETTE));
+            };
+
+            const canvasRef = useRef(null);
+            const canvasContentRef = useRef(null);
+            const lineNumbersRef = useRef(null);
+            const textareaRef = useRef(null); 
+            const [draggingNodeId, setDraggingNodeId] = useState(null);
+            const nodeElRefs = useRef({});
+            const dragInfoRef = useRef({ id: null, startMouseX: 0, startMouseY: 0, nodeStartX: 0, nodeStartY: 0, dx: 0, dy: 0 });
+            const panInfoRef = useRef({ startX: 0, startY: 0, baseX: 0, baseY: 0, currentX: 0, currentY: 0 });
+            const abortControllerRef = useRef(null);
+
+            useEffect(() => { if (geminiApiKey) fetchGeminiModels(geminiApiKey); }, [geminiApiKey]);
+            useEffect(() => { fetchOllamaModels(); }, []);
+            useEffect(() => { filesRef.current = files; }, [files]);
+
+            const fetchGeminiModels = async (key) => {
+                try {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models`, {
+                        headers: { 'x-goog-api-key': key }
+                    });
+                    if (!res.ok) throw new Error("API Key inválida");
+                    const responseData = await res.json();
+                    const validModels = responseData.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+                    setAvailableGeminiModels(validModels);
+                    if (!geminiModel || !validModels.find(m => m.name === geminiModel)) {
+                        const defaultModel = validModels.find(m => m.name.includes("flash")) || validModels[0];
+                        if (defaultModel) {
+                            setGeminiModel(defaultModel.name);
+                            localStorage.setItem('gemini_selected_model', defaultModel.name);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error al cargar modelos de Gemini:", e);
+                }
+            };
+
+            // --- CARGAR MODELOS DESDE OLLAMA ---
+            const fetchOllamaModels = async () => {
+                try {
+                    const res = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
+                    if (!res.ok) throw new Error('SERVER_ERROR');
+                    const data = await res.json();
+                    if (data && Array.isArray(data.models)) {
+                        setAvailableOllamaModels(data.models);
+                        // Si el modelo actual no está en la lista pero hay modelos, selecciona el primero
+                        if (data.models.length > 0 && !data.models.some(m => m.name === ollamaModel)) {
+                            setOllamaModel(data.models[0].name);
+                            localStorage.setItem('ollama_model', data.models[0].name);
+                        }
+                    }
+                } catch (err) {
+                    console.warn("No se pudieron cargar los modelos locales de Ollama automáticamente (¿está apagado o sin CORS?).");
+                }
+            };
+
+            const verifyLocalModel = async (silent = false) => {
+                if (!silent) setOllamaStatus({ state: 'testing', message: 'Verificando conexión con Ollama...' });
+                try {
+                    const res = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
+                    if (!res.ok) throw new Error('SERVER_ERROR');
+                    const data = await res.json();
+                    
+                    const targetModel = ollamaModel.includes(':') ? ollamaModel : `${ollamaModel}:latest`;
+                    const modelExists = data.models.some(m => m.name === ollamaModel || m.name === targetModel);
+                    
+                    setAvailableOllamaModels(data.models);
+
+                    if (modelExists) {
+                        if (!silent) setOllamaStatus({ state: 'success', message: `✅ Conexión exitosa. El modelo "${ollamaModel}" está listo.` });
+                        return true;
+                    } else {
+                        if (!silent) setOllamaStatus({ state: 'error', message: `❌ Conectado a Ollama, pero el modelo "${ollamaModel}" NO está instalado. Ejecuta: ollama pull ${ollamaModel}` });
+                        return false;
+                    }
+                } catch (err) {
+                    if (!silent) setOllamaStatus({ state: 'error', message: '❌ No se pudo conectar a Ollama. Verifica que el servicio esté corriendo y tenga configurado OLLAMA_ORIGINS="*".' });
+                    return false;
+                }
+            };
+
+            const saveSettings = () => { 
+                localStorage.setItem('gemini_api_key', geminiApiKey.trim()); 
+                localStorage.setItem('gemini_selected_model', geminiModel);
+                localStorage.setItem('ollama_model', ollamaModel.trim()); 
+                setShowSettings(false); 
+            };
+
+            const toggleApiMode = () => {
+                const newMode = apiMode === 'local' ? 'cloud' : 'local';
+                setApiMode(newMode);
+                localStorage.setItem('api_mode', newMode);
+                setSettingsTab(newMode);
+            };
+
+            const handleFileUpload = async (e) => {
+                const uploadedFiles = Array.from(e.target.files);
+                if (uploadedFiles.length === 0) return;
+
+                const readFile = (file) => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => resolve({ name: file.name, content: event.target.result });
+                    reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
+                    reader.readAsText(file);
+                });
+
+                try {
+                    const newFiles = await Promise.all(uploadedFiles.map(readFile));
+                    setFiles(prev => {
+                        const combined = [...prev, ...newFiles];
+                        setActiveFileId(combined.length - 1);
+                        return combined;
+                    });
+                } catch (err) {
+                    console.error(err);
+                    setAiStatus("Error leyendo uno o más archivos subidos.");
+                    setAiStatusLevel("error");
+                }
+                e.target.value = null;
+            };
+
+            const addNewFile = () => {
+                setNewFileName(`archivo_${files.length + 1}.cpp`);
+                setNewFileModal(true);
+            };
+
+            const confirmNewFile = () => {
+                const name = newFileName.trim();
+                if (name) { setFiles(prev => { setActiveFileId(prev.length); return [...prev, { name, content: "// Escribe código aquí..." }]; }); }
+                setNewFileModal(false);
+            };
+
+            const removeFile = (idx) => {
+                const newFiles = files.filter((_, i) => i !== idx);
+                if (newFiles.length === 0) { setFiles([{ name: "main.cpp", content: "" }]); setActiveFileId(0); } 
+                else { setFiles(newFiles); setActiveFileId(Math.max(0, idx - 1)); }
+            };
+
+            const updateActiveFile = (content) => {
+                const newFiles = [...files];
+                newFiles[activeFileId] = { ...newFiles[activeFileId], content };
+                setFiles(newFiles);
+            };
+
+            const handleScroll = () => {
+                if (lineNumbersRef.current && textareaRef.current) {
+                    lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+                }
+            };
+
+            useEffect(() => {
+                if (activeNode && activeNode.lines && textareaRef.current && files[activeFileId]?.name === activeNode.file) {
+                    const startLine = activeNode.lines[0];
+                    const lineHeight = 20;
+                    const scrollToY = Math.max(0, (startLine - 3) * lineHeight);
+                    textareaRef.current.scrollTo({ top: scrollToY, behavior: 'smooth' });
+                }
+            }, [activeNode, activeFileId, files]);
+
+            const getCombinedCodeForAI = () => files.map(f => `--- ARCHIVO: ${f.name} ---\n${f.content}\n`).join('\n');
+
+            const cancelAnalysis = () => {
+                if (abortControllerRef.current) abortControllerRef.current.abort();
+                setIsAnalyzing(false);
+                setAiStatus("Análisis cancelado.");
+                setAiStatusLevel("warning");
+            };
+
+            const handleAnalyze = async () => {
+                setIsAnalyzing(true); setActiveNode(null); setActiveFlowExplanation(null); setSimStep(-1); setIsPlaying(false);
+                setAiStatusLevel("info");
+                const combinedCode = getCombinedCodeForAI();
+                setView({ x: 0, y: 0, zoom: 1 });
+
+                const estimatedTokens = estimateTokens(combinedCode);
+                const CONTEXT_WARNING_THRESHOLD = apiMode === 'local' ? 6000 : 200000;
+                if (estimatedTokens > CONTEXT_WARNING_THRESHOLD) {
+                    setAiStatus(`Aviso: el proyecto es grande (~${estimatedTokens.toLocaleString()} tokens estimados). La respuesta podría truncarse. Considera analizar por archivo.`);
+                    setAiStatusLevel("warning");
+                }
+
+                const prompt = buildArchitecturePrompt(combinedCode);
+                const controller = new AbortController();
+                abortControllerRef.current = controller;
+
+                try {
+                    let parsedData;
+
+                    if (apiMode === 'cloud') {
+                        if (!geminiApiKey) throw new Error("MISSING_API_KEY");
+                        
+                        setAiStatus(`Interpretando con ${geminiModel.split('/')[1] || geminiModel} (Cloud)...`);
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiModel}:generateContent`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: prompt }] }],
+                                generationConfig: { temperature: 0.15, maxOutputTokens: 8192, responseMimeType: "application/json" }
+                            }),
+                            signal: controller.signal
+                        });
+
+                        if (!response.ok) {
+                            if (response.status === 429) throw new Error("RATE_LIMIT");
+                            if (response.status === 401 || response.status === 403) throw new Error("MISSING_API_KEY");
+                            throw new Error("API_ERROR");
+                        }
+                        const result = await response.json();
+                        const candidate = result.candidates?.[0];
+                        if (!candidate || candidate.finishReason === "SAFETY") throw new Error("BLOCKED_OR_EMPTY");
+                        let textResp = candidate.content?.parts?.[0]?.text || "";
+                        textResp = textResp.replace(/```json/gi, '').replace(/```/g, '').trim();
+                        if (!textResp) throw new Error("BLOCKED_OR_EMPTY");
+                        parsedData = JSON.parse(textResp);
+
+                    } else {
+                        setAiStatus(`Verificando entorno local de Ollama...`);
+                        const isOllamaReady = await verifyLocalModel(true);
+                        if (!isOllamaReady) throw new Error("OLLAMA_VERIFICATION_FAILED");
+
+                        if (location.protocol === 'https:') {
+                            throw new Error("MIXED_CONTENT");
+                        }
+                        setAiStatus(`Interpretando con ${ollamaModel} (${useGpu ? 'GPU' : 'CPU'})...`);
+                        const response = await fetch('http://localhost:11434/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: ollamaModel,
+                                prompt: prompt,
+                                format: "json",
+                                stream: false,
+                                options: { temperature: 0.1, num_ctx: Math.max(8192, estimatedTokens + 2048), num_predict: 4096, num_gpu: useGpu ? 99 : 0 }
+                            }),
+                            signal: controller.signal
+                        });
+
+                        if (!response.ok) throw new Error("OLLAMA_ERROR");
+                        const result = await response.json();
+                        if (!result.response) throw new Error("BLOCKED_OR_EMPTY");
+                        parsedData = JSON.parse(result.response.trim());
+                    }
+
+                    const clean = sanitizeAIData(parsedData);
+                    if (clean.nodes.length === 0) throw new Error("EMPTY_RESULT");
+
+                    setSessionRequests(prev => prev + 1); 
+                    setData(clean);
+                    setAiStatus("Interpretación completada.");
+                    setAiStatusLevel("info");
+                    setIsAnalyzing(false);
+
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    console.error("Fallo durante el análisis:", err);
+                    setAiStatusLevel("error");
+                    switch (err.message) {
+                        case "MISSING_API_KEY":
+                            setAiStatus("Falta o es inválida la API Key de Gemini. Configúrala en ajustes.");
+                            setIsAnalyzing(false);
+                            break;
+                        case "RATE_LIMIT":
+                            setAiStatus("Límite de peticiones de Gemini alcanzado. Espera un minuto o cambia de modelo.");
+                            setIsAnalyzing(false);
+                            break;
+                        case "BLOCKED_OR_EMPTY":
+                            setAiStatus("El modelo no devolvió contenido (posible filtro de seguridad o corte). Activando heurística...");
+                            fallbackHeuristic(combinedCode);
+                            break;
+                        case "MIXED_CONTENT":
+                            setAiStatus("Esta página se sirve por HTTPS y no puede llamar a http://localhost. Usa Cloud Mode o sirve la app por HTTP local.");
+                            setIsAnalyzing(false);
+                            break;
+                        case "OLLAMA_VERIFICATION_FAILED":
+                            setAiStatus(`Error crítico: Ollama no responde o falta el modelo "${ollamaModel}". Ábrelo en ajustes para verificar.`);
+                            setIsAnalyzing(false);
+                            break;
+                        case "OLLAMA_ERROR":
+                            setAiStatus("Error inesperado al generar con Ollama. Activando heurística...");
+                            fallbackHeuristic(combinedCode);
+                            break;
+                        case "EMPTY_RESULT":
+                            setAiStatus("La IA no devolvió nodos válidos. Activando heurística...");
+                            fallbackHeuristic(combinedCode);
+                            break;
+                        default:
+                            if (err instanceof SyntaxError) {
+                                setAiStatus("La respuesta del modelo no era JSON válido (probable corte por límite de tokens). Activando heurística...");
+                            } else {
+                                setAiStatus("Fallo en la API. Activando heurística...");
+                            }
+                            fallbackHeuristic(combinedCode);
+                    }
+                }
+            };
+
+            const fallbackHeuristic = (code) => {
+                const nodes = []; const edges = []; const flow = [];
+                let cols = 3; let index = 0; let match;
+                
+                const addNode = (type, label, purpose, lines) => {
+                    const id = `n${nodes.length}`;
+                    let col = index % cols;
+                    let row = Math.floor(index / cols);
+                    let layoutX = 100 + (col * 300);
+                    let layoutY = 80 + (row * 250);
+
+                    nodes.push({ id, type, label, lines: lines || [1, 2], purpose, inputs: '-', outputs: '-', file: 'Auto-detectado', x: layoutX, y: layoutY });
+                    flow.push({ nodeId: id, explanation: `Ejecución / Declaración de ${label}.` });
+                    index++; return id;
+                };
+
+                const rxClass = /(?:class|struct)\s+([a-zA-Z0-9_]+)/g;
+                while ((match = rxClass.exec(code)) !== null) addNode('class', match[1], 'Estructura o Clase detectada.');
+                
+                const rxFunc = /(?:void|int|float|double|bool|auto|char|std::string)\s+([a-zA-Z0-9_:]+)\s*\(/g;
+                while ((match = rxFunc.exec(code)) !== null) {
+                    if(!match[1].includes('main')) addNode('function', match[1], 'Función o método local detectado.');
+                }
+
+                const rxControl = /\b(if|for|while|switch)\b\s*\(/g;
+                while ((match = rxControl.exec(code)) !== null) addNode('control', match[1].toUpperCase() + ' Block', 'Bloque de control o bucle iterativo.');
+
+                if (nodes.length === 0) addNode('function', 'Main Script', 'Bloque principal de ejecución secuencial.');
+
+                setData({ nodes, edges, flow, summary: "Modo Heurístico (Fallo de IA): Se han detectado estructuras usando Regex." });
+                setIsAnalyzing(false);
+            };
+
+            useEffect(() => {
+                let interval;
+                if (isPlaying) {
+                    interval = setInterval(() => {
+                        setSimStep(prev => {
+                            if (prev >= data.flow.length - 1) { setIsPlaying(false); return prev; }
+                            return prev + 1;
+                        });
+                    }, 2500); 
+                }
+                return () => clearInterval(interval);
+            }, [isPlaying, data.flow?.length]);
+
+            useEffect(() => {
+                if (simStep >= 0 && data.flow && simStep < data.flow.length) {
+                    const currentFlow = data.flow[simStep];
+                    const node = data.nodes.find(n => n.id === currentFlow.nodeId);
+                    if (!node) return;
+
+                    setActiveNode(node);
+                    setActiveFlowExplanation(currentFlow.explanation);
+                    
+                    if (node.file) {
+                        const fileIdx = files.findIndex(f => f.name === node.file);
+                        if (fileIdx !== -1) setActiveFileId(fileIdx);
+                    }
+                } else if (simStep === -1 && !isPlaying) {
+                    setActiveFlowExplanation(null);
+                }
+            }, [simStep, data, files, isPlaying]);
+
+            const handleCanvasWheel = useCallback((e) => {
+                e.preventDefault();
+                if (!canvasRef.current) return;
+                
+                const rect = canvasRef.current.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const currentView = viewRef.current;
+                const zoomIntensity = 0.002;
+                const zoomDelta = e.deltaY * -zoomIntensity;
+                const newZoom = Math.min(Math.max(0.2, currentView.zoom + zoomDelta), 4);
+
+                const newX = mouseX - (mouseX - currentView.x) * (newZoom / currentView.zoom);
+                const newY = mouseY - (mouseY - currentView.y) * (newZoom / currentView.zoom);
+
+                setView({ x: newX, y: newY, zoom: newZoom });
+            }, []);
+
+            const handleCanvasMouseDown = (e) => {
+                if (!e.target.closest('.node-block')) {
+                    setIsCanvasPanning(true);
+                    const currentView = viewRef.current;
+                    panInfoRef.current = { startX: e.clientX, startY: e.clientY, baseX: currentView.x, baseY: currentView.y, currentX: currentView.x, currentY: currentView.y };
+                }
+            };
+
+            // PERF: durante el arrastre (pan de canvas o drag de nodo) NO tocamos el estado de React
+            // en cada mousemove -- eso forzaría re-render de todos los nodos/aristas muchas veces por segundo.
+            // En su lugar aplicamos un transform directo sobre el DOM (vía refs) y solo confirmamos
+            // el resultado final en el estado al soltar el ratón (handleGlobalMouseUp).
+            const handleGlobalMouseMove = useCallback((e) => {
+                if (isCanvasPanning) {
+                    const nx = panInfoRef.current.baseX + (e.clientX - panInfoRef.current.startX);
+                    const ny = panInfoRef.current.baseY + (e.clientY - panInfoRef.current.startY);
+                    panInfoRef.current.currentX = nx;
+                    panInfoRef.current.currentY = ny;
+                    if (canvasContentRef.current) {
+                        canvasContentRef.current.style.transform = `translate(${nx}px, ${ny}px) scale(${viewRef.current.zoom})`;
+                    }
+                } else if (draggingNodeId && canvasRef.current) {
+                    const drag = dragInfoRef.current;
+                    if (drag.id !== draggingNodeId) return;
+                    const rect = canvasRef.current.getBoundingClientRect();
+                    const currentView = viewRef.current;
+                    const mouseX = (e.clientX - rect.left - currentView.x) / currentView.zoom;
+                    const mouseY = (e.clientY - rect.top - currentView.y) / currentView.zoom;
+                    const dx = mouseX - drag.startMouseX;
+                    const dy = mouseY - drag.startMouseY;
+                    drag.dx = dx; drag.dy = dy;
+                    const el = nodeElRefs.current[draggingNodeId];
+                    if (el) el.style.transform = `translate(${dx}px, ${dy}px)`;
+                }
+            }, [isCanvasPanning, draggingNodeId]);
+
+            const handleGlobalMouseUp = useCallback(() => {
+                setIsCanvasPanning(prevPanning => {
+                    if (prevPanning) {
+                        const { currentX, currentY } = panInfoRef.current;
+                        setView(prev => ({ ...prev, x: currentX, y: currentY }));
+                    }
+                    return false;
+                });
+
+                setDraggingNodeId(prevId => {
+                    const drag = dragInfoRef.current;
+                    if (prevId && drag.id === prevId && (drag.dx !== 0 || drag.dy !== 0)) {
+                        const finalX = drag.nodeStartX + drag.dx;
+                        const finalY = drag.nodeStartY + drag.dy;
+                        setData(prev => ({
+                            ...prev,
+                            nodes: prev.nodes.map(n => n.id === prevId ? { ...n, x: finalX, y: finalY } : n)
+                        }));
+                        const el = nodeElRefs.current[prevId];
+                        if (el) el.style.transform = '';
+                    }
+                    dragInfoRef.current = { id: null, startMouseX: 0, startMouseY: 0, nodeStartX: 0, nodeStartY: 0, dx: 0, dy: 0 };
+                    return null;
+                });
+            }, []);
+
+            useEffect(() => {
+                window.addEventListener('mousemove', handleGlobalMouseMove);
+                window.addEventListener('mouseup', handleGlobalMouseUp);
+                const canvasEl = canvasRef.current;
+                if (canvasEl) canvasEl.addEventListener('wheel', handleCanvasWheel, { passive: false });
+                
+                return () => { 
+                    window.removeEventListener('mousemove', handleGlobalMouseMove); 
+                    window.removeEventListener('mouseup', handleGlobalMouseUp); 
+                    if(canvasEl) canvasEl.removeEventListener('wheel', handleCanvasWheel);
+                };
+            }, [handleGlobalMouseMove, handleCanvasWheel]);
+
+            const handleNodeClick = useCallback((e, node) => {
+                e.stopPropagation(); 
+                setActiveNode(node);
+                setDraggingNodeId(node.id);
+                setSimStep(-1);
+                setIsPlaying(false);
+                setActiveFlowExplanation(null);
+
+                if (canvasRef.current) {
+                    const rect = canvasRef.current.getBoundingClientRect();
+                    const currentView = viewRef.current;
+                    const mouseX = (e.clientX - rect.left - currentView.x) / currentView.zoom;
+                    const mouseY = (e.clientY - rect.top - currentView.y) / currentView.zoom;
+                    dragInfoRef.current = { id: node.id, startMouseX: mouseX, startMouseY: mouseY, nodeStartX: node.x, nodeStartY: node.y, dx: 0, dy: 0 };
+                }
+
+                if (node && node.file) {
+                    const fileIdx = filesRef.current.findIndex(f => f.name === node.file);
+                    if (fileIdx !== -1) setActiveFileId(fileIdx);
+                }
+            }, []);
+
+            const activeCode = files[activeFileId]?.content || "";
+            const lineCount = activeCode.split('\n').length;
+            const lineNumbers = useMemo(
+                () => Array.from({ length: Math.max(lineCount, 15) }, (_, i) => i + 1),
+                [lineCount]
+            );
+
+            const renderedEdges = useMemo(() => {
+                return data.edges.map((edge, i) => {
+                    const from = data.nodes.find(n => n.id === edge.from);
+                    const to = data.nodes.find(n => n.id === edge.to);
+                    if (!from || !to) return null;
+                    return { edge, from, to, key: i };
+                }).filter(Boolean);
+            }, [data.edges, data.nodes]);
+
+            // Referencia estable (no cambia de identidad) para registrar los elementos DOM de cada nodo
+            const registerRef = useCallback((id, el) => {
+                if (el) nodeElRefs.current[id] = el;
+                else delete nodeElRefs.current[id];
+            }, []);
+
+            // Recalcula los estilos de tema (colores) solo cuando cambia la paleta, no en cada render
+            const nodeThemes = useMemo(() => {
+                const themes = {};
+                Object.keys(NODE_TYPES).forEach(type => { themes[type] = getNodeTheme(type, palette); });
+                return themes;
+            }, [palette]);
+
+            return (
+                <div className="flex flex-col h-full bg-[#020617] text-slate-200">
+                    <div className="h-16 border-b border-slate-800 glass flex items-center px-6 justify-between z-50 shrink-0">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                                <Icons.Activity />
+                            </div>
+                            <h1 className="text-xl font-bold tracking-tight text-white">Code<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Interpreter</span> AI</h1>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            
+                            <button onClick={toggleApiMode} className={`text-xs px-4 py-2 rounded-full flex items-center space-x-2 transition-all font-bold shadow-lg ${apiMode === 'cloud' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500' : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500'}`} title="Cambiar motor de IA">
+                                {apiMode === 'cloud' ? <Icons.Cloud /> : <Icons.Server />}
+                                <span>{apiMode === 'cloud' ? 'Cloud Mode (Gemini)' : 'Local Mode (Ollama)'}</span>
+                            </button>
+
+                            {apiMode === 'local' && (
+                                <button onClick={() => setUseGpu(!useGpu)} className={`text-xs px-3 py-1.5 rounded-full flex items-center space-x-2 transition-colors ${useGpu ? 'bg-purple-950/50 text-purple-400 border border-purple-800/50 hover:bg-purple-900/50' : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'}`} title="Alternar aceleración de hardware">
+                                    {useGpu ? <Icons.Zap /> : <Icons.Cpu />}
+                                    <span className="font-semibold hidden lg:inline">{useGpu ? 'GPU On' : 'CPU Only'}</span>
+                                </button>
+                            )}
+
+                            <div className="hidden md:flex flex-col text-right mr-2 border-l border-slate-700 pl-4">
+                                <span className="text-xs font-semibold text-slate-300">Modelo: <span className={apiMode === 'cloud' ? 'text-blue-400' : 'text-emerald-400'}>{apiMode === 'cloud' ? (geminiModel.split('/')[1] || geminiModel) : ollamaModel}</span></span>
+                                <span className="text-[10px] text-slate-500">Peticiones: {sessionRequests}</span>
+                            </div>
+
+                            <button onClick={() => { setSettingsTab(apiMode); setShowSettings(true); fetchOllamaModels(); }} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors">
+                                <Icons.Settings />
+                            </button>
+                        </div>
+                    </div>
+
+                    {showSettings && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                            <div className="glass-panel p-6 rounded-2xl max-w-[550px] w-full border border-slate-700 shadow-2xl flex flex-col">
+                                <h2 className="text-lg font-bold text-white mb-4">Configuración de Inteligencia Artificial</h2>
+                                
+                                <div className="flex space-x-2 mb-4 border-b border-slate-800">
+                                    <button onClick={() => setSettingsTab('local')} className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${settingsTab === 'local' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>Local (Ollama)</button>
+                                    <button onClick={() => setSettingsTab('cloud')} className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${settingsTab === 'cloud' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>Cloud (Gemini)</button>
+                                    <button onClick={() => setSettingsTab('colors')} className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${settingsTab === 'colors' ? 'border-pink-500 text-pink-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Icons.Palette /> Colores</button>
+                                </div>
+
+                                <div className="space-y-4 mb-6 flex-1">
+                                    {settingsTab === 'colors' ? (
+                                        <div className="animate-fade-in">
+                                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-4">
+                                                <h3 className="text-sm font-bold text-pink-400 mb-2 flex items-center gap-2"><Icons.Info /> Paleta de nodos</h3>
+                                                <p className="text-xs text-slate-300 leading-relaxed">Elige el color asociado a cada tipo de nodo del diagrama. Los cambios se aplican al instante y se guardan en este navegador.</p>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {Object.entries(NODE_TYPES).map(([type, cfg]) => {
+                                                    const IconComponent = Icons[cfg.icon] || Icons.Code;
+                                                    return (
+                                                        <div key={type} className="flex items-center justify-between bg-slate-900/50 border border-slate-800 rounded-lg p-3">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="shrink-0 p-2 rounded-lg" style={{ backgroundColor: rgba(palette[type], 0.2), color: palette[type] }}>
+                                                                    <IconComponent />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="text-sm font-semibold text-slate-200 truncate">{cfg.label}</div>
+                                                                    <div className="text-[10px] text-slate-500 font-mono uppercase">{type}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <span className="text-[11px] font-mono text-slate-400">{palette[type]}</span>
+                                                                <input
+                                                                    type="color"
+                                                                    value={palette[type]}
+                                                                    onChange={(e) => updatePaletteColor(type, e.target.value)}
+                                                                    className="w-9 h-9 rounded-lg border border-slate-700 bg-slate-950 cursor-pointer"
+                                                                    title={`Color para ${cfg.label}`}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="mt-4 pt-4 border-t border-slate-800/50">
+                                                <button onClick={resetPalette} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition">
+                                                    <Icons.Refresh /> <span>Restablecer colores por defecto</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : settingsTab === 'local' ? (
+                                        <div className="animate-fade-in">
+                                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-4">
+                                                <h3 className="text-sm font-bold text-emerald-400 mb-2 flex items-center gap-2"><Icons.Info /> Guía Rápida: Ollama</h3>
+                                                <ol className="text-xs text-slate-300 space-y-3 list-decimal list-inside ml-1">
+                                                    <li>Instala <a href="https://ollama.com" target="_blank" className="text-indigo-400 hover:underline">Ollama</a> en tu equipo.</li>
+                                                    <li>Descarga un modelo: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-emerald-300 font-mono">ollama pull qwen2.5-coder:7b</code></li>
+                                                    <li className="leading-relaxed">
+                                                        Configura CORS permanentemente (recomendado para Linux/systemd): <br/>
+                                                        <code className="bg-slate-800 px-1.5 py-0.5 rounded text-emerald-300 font-mono mt-1.5 inline-block">sudo systemctl edit ollama</code><br/>
+                                                        <span className="inline-block mt-1">Añade <code className="text-indigo-300 font-mono bg-slate-950 px-1 rounded">Environment="OLLAMA_ORIGINS=*"</code> bajo la sección <code className="text-indigo-300 font-mono bg-slate-950 px-1 rounded">[Service]</code>.</span><br/>
+                                                        <span className="inline-block mt-1">Guarda y reinicia el servicio: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-emerald-300 font-mono">sudo systemctl restart ollama</code></span>
+                                                    </li>
+                                                </ol>
+                                            </div>
+                                            
+                                            <div>
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <label className="text-xs font-semibold text-slate-300">Seleccionar Modelo Local</label>
+                                                    <button onClick={fetchOllamaModels} className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                                                        <Icons.Refresh /> Actualizar lista
+                                                    </button>
+                                                </div>
+                                                <select 
+                                                    value={ollamaModel} 
+                                                    onChange={e => { setOllamaModel(e.target.value); setOllamaStatus({state: 'idle', message: ''}); }}
+                                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-300 focus:outline-none focus:border-emerald-500 font-mono"
+                                                >
+                                                    {availableOllamaModels.length === 0 ? (
+                                                        <option value={ollamaModel}>{ollamaModel} (Escribe o asegúrate que Ollama esté corriendo)</option>
+                                                    ) : (
+                                                        availableOllamaModels.map(m => (
+                                                            <option key={m.name} value={m.name}>{m.name} ({Math.round(m.size / (1024*1024*1024) * 10) / 10} GB)</option>
+                                                        ))
+                                                    )}
+                                                </select>
+                                            </div>
+                                            
+                                            <div className="mt-4 border-t border-slate-800/50 pt-4">
+                                                <button onClick={() => verifyLocalModel(false)} className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition">
+                                                    {ollamaStatus.state === 'testing' ? <Icons.Activity /> : <Icons.Check />}
+                                                    <span>{ollamaStatus.state === 'testing' ? 'Verificando...' : 'Verificar Conexión y Modelo'}</span>
+                                                </button>
+                                                {ollamaStatus.message && (
+                                                    <div className={`mt-3 text-xs p-3 rounded-lg flex items-start gap-2 ${ollamaStatus.state === 'success' ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/50' : 'bg-red-950/40 text-red-300 border border-red-800/50'}`}>
+                                                        <span>{ollamaStatus.message}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="animate-fade-in">
+                                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-4">
+                                                <h3 className="text-sm font-bold text-blue-400 mb-2 flex items-center gap-2"><Icons.Info /> Guía Rápida: Gemini API</h3>
+                                                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside ml-2">
+                                                    <li>Consigue tu API Key gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-400 hover:underline">Google AI Studio</a>.</li>
+                                                    <li>Pega tu clave en el campo de abajo.</li>
+                                                    <li>Selecciona un modelo. Se recomienda usar <strong>Flash</strong> porque ofrece 15 peticiones gratuitas por minuto.</li>
+                                                </ol>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-xs font-semibold text-slate-300 block mb-1">Clave de API Gemini</label>
+                                                    <input type="password" value={geminiApiKey} onChange={e => setGeminiApiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500" />
+                                                </div>
+                                                {geminiApiKey && (
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-slate-300 block mb-1">Motor de Análisis</label>
+                                                        <select value={geminiModel} onChange={e => setGeminiModel(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500">
+                                                            {availableGeminiModels.length === 0 ? <option>Cargando modelos...</option> : availableGeminiModels.map(m => <option key={m.name} value={m.name}>{m.displayName || m.name} ({m.version || 'Última'})</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+                                    <button onClick={() => setShowSettings(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-800">Cancelar</button>
+                                    <button onClick={saveSettings} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white shadow-lg">Guardar Ajustes</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {newFileModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onMouseDown={() => setNewFileModal(false)}>
+                            <div className="glass-panel p-6 rounded-2xl max-w-[380px] w-full border border-slate-700 shadow-2xl" onMouseDown={e => e.stopPropagation()}>
+                                <h2 className="text-sm font-bold text-white mb-3">Nuevo archivo</h2>
+                                <input
+                                    autoFocus type="text" value={newFileName}
+                                    onChange={e => setNewFileName(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') confirmNewFile(); if (e.key === 'Escape') setNewFileModal(false); }}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-300 font-mono focus:outline-none focus:border-indigo-500 mb-4"
+                                />
+                                <div className="flex justify-end space-x-3">
+                                    <button onClick={() => setNewFileModal(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-800">Cancelar</button>
+                                    <button onClick={confirmNewFile} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white shadow-lg">Crear</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="flex-1 flex gap-4 p-4 overflow-hidden relative z-10 w-full">
+                        
+                        <div className="resizable-panel flex flex-col glass-panel rounded-2xl shadow-xl w-[25%] shrink-0">
+                            <div className="px-4 py-3 flex justify-between items-center bg-slate-900/80 shrink-0 border-b border-slate-800">
+                                <div className="flex items-center space-x-2 text-slate-300">
+                                    <Icons.Code />
+                                    <h2 className="text-sm font-semibold truncate">Workspace</h2>
+                                </div>
+                                <label className="cursor-pointer flex items-center space-x-1 text-xs bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 px-2 py-1 rounded-lg transition-all">
+                                    <Icons.Upload /> <span className="hidden xl:inline">Subir</span>
+                                    <input type="file" multiple className="hidden" onChange={handleFileUpload} accept=".cpp,.hpp,.c,.h,.py,.js,.ts,.json,.txt,.rs,.go" />
+                                </label>
+                            </div>
+                            <div className="flex overflow-x-auto bg-slate-900 border-b border-slate-800/50 no-scrollbar shrink-0">
+                                {files.map((file, idx) => (
+                                    <div key={idx} onClick={() => setActiveFileId(idx)} className={`px-4 py-2.5 text-xs font-mono cursor-pointer flex items-center space-x-2 border-b-2 whitespace-nowrap transition-colors ${activeFileId === idx ? 'border-indigo-500 text-indigo-400 bg-slate-800/50' : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'}`}>
+                                        <span>{file.name}</span>
+                                        <button onClick={(e) => { e.stopPropagation(); removeFile(idx); }} className="hover:text-red-400 p-0.5 rounded-full hover:bg-slate-700/50"><Icons.X /></button>
+                                    </div>
+                                ))}
+                                <button onClick={addNewFile} className="px-4 py-2.5 text-slate-500 hover:text-slate-300 border-b-2 border-transparent" title="Nuevo archivo"><Icons.Plus /></button>
+                            </div>
+                            
+                            <div className="flex-1 flex overflow-hidden relative bg-[#010409]">
+                                {isAnalyzing && <div className="absolute inset-0 z-20 pointer-events-none ai-scanning"></div>}
+                                <div ref={lineNumbersRef} className="w-10 bg-slate-900/50 border-r border-slate-800/50 flex flex-col items-end py-4 pr-2 text-xs font-mono text-slate-600 select-none overflow-hidden no-scrollbar">
+                                    {lineNumbers.map(num => {
+                                        const isHighlight = activeNode && activeNode.file === files[activeFileId]?.name && num >= activeNode.lines[0] && num <= activeNode.lines[1];
+                                        return <div key={num} className={isHighlight ? "text-indigo-400 font-bold" : ""}>{num}</div>;
+                                    })}
+                                </div>
+                                <textarea 
+                                    ref={textareaRef} value={activeCode} onChange={(e) => updateActiveFile(e.target.value)} onScroll={handleScroll} spellCheck="false"
+                                    className="flex-1 bg-transparent text-slate-300 font-mono text-[13px] p-4 focus:outline-none resize-none whitespace-pre no-scrollbar leading-tight selection:bg-indigo-500/30 min-w-0"
+                                    style={{ lineHeight: '1.25rem' }}
+                                />
+                            </div>
+                            <div className="p-4 border-t border-slate-800/50 bg-slate-900/80 shrink-0 space-y-2">
+                                {aiStatus && (
+                                    <div className={`text-[11px] px-3 py-2 rounded-lg flex items-start gap-2 toast-enter
+                                        ${aiStatusLevel === 'error' ? 'bg-red-950/40 text-red-300 border border-red-800/40' :
+                                          aiStatusLevel === 'warning' ? 'bg-amber-950/40 text-amber-300 border border-amber-800/40' :
+                                          'bg-slate-800/40 text-slate-400 border border-slate-700/40'}`}>
+                                        {aiStatusLevel !== 'info' && <span className="mt-0.5 shrink-0"><Icons.AlertTriangle /></span>}
+                                        <span>{aiStatus}</span>
+                                    </div>
+                                )}
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={handleAnalyze} disabled={isAnalyzing}
+                                        className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-all shadow-lg flex items-center justify-center space-x-2 truncate
+                                        ${isAnalyzing ? 'bg-indigo-600/50 text-white cursor-wait ai-glow' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]'}`}>
+                                        <Icons.Sparkles />
+                                        <span>{isAnalyzing ? "Analizando..." : `Interpretar Proyecto`}</span>
+                                    </button>
+                                    {isAnalyzing && (
+                                        <button onClick={cancelAnalysis} className="px-4 py-3 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all" title="Cancelar análisis">
+                                            <Icons.X />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col glass-panel rounded-2xl overflow-hidden shadow-xl relative">
+                            
+                            <div className="absolute top-4 left-4 z-20 flex flex-col space-y-2 glass p-3 rounded-xl border border-slate-700/50 shadow-lg text-xs backdrop-blur-md pointer-events-none">
+                                <span className="font-bold text-slate-300 border-b border-slate-700 pb-1 mb-1">Clasificación Semántica</span>
+                                {Object.entries(NODE_TYPES).map(([k, v]) => (
+                                    <div key={k} className="flex items-center space-x-2">
+                                        <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: nodeThemes[k].dot, borderColor: nodeThemes[k].hex }}></div>
+                                        <span className="text-slate-400">{v.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="absolute top-4 right-4 z-20 flex space-x-2">
+                                <button onClick={() => setView({x:0, y:0, zoom:1})} className="glass p-2 rounded-lg border border-slate-700/50 text-slate-400 hover:text-white shadow-lg transition-colors flex items-center space-x-1 text-xs font-semibold" title="Resetear Zoom y Posición">
+                                    <Icons.Maximize /> <span>Reset Vista</span>
+                                </button>
+                            </div>
+
+                            {data.summary && (
+                                <div className="absolute top-16 right-4 z-20 w-64 glass p-4 rounded-xl border-l-4 border-l-indigo-500 shadow-2xl text-xs backdrop-blur-xl">
+                                    <div className="flex items-center space-x-2 mb-2 text-indigo-400">
+                                        <Icons.Info />
+                                        <span className="font-bold uppercase tracking-wider text-[10px]">Visión General</span>
+                                    </div>
+                                    <p className="text-slate-300 leading-relaxed font-medium">{data.summary}</p>
+                                </div>
+                            )}
+                            
+                            <div 
+                                className={`flex-1 relative overflow-hidden ${isCanvasPanning ? 'cursor-grabbing' : 'cursor-grab'}`} 
+                                ref={canvasRef}
+                                onMouseDown={handleCanvasMouseDown}
+                            >
+                                <div ref={canvasContentRef} style={{ 
+                                     transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
+                                     transformOrigin: '0 0',
+                                     width: '100%', height: '100%',
+                                     position: 'absolute', top: 0, left: 0
+                                 }}>
+                                     
+                                    <div style={{
+                                        position: 'absolute', top: '-5000px', left: '-5000px', right: '-5000px', bottom: '-5000px',
+                                        backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 0)', 
+                                        backgroundSize: '30px 30px'
+                                    }}></div>
+
+                                    <svg className="absolute w-full h-full pointer-events-none z-0" style={{ overflow: 'visible' }}>
+                                        {renderedEdges.map(({ edge, from, to, key }) => {
+                                            const startX = from.x + 80; const startY = from.y + 48;
+                                            const endX = to.x + 80; const endY = to.y;
+                                            const active = activeNode && (activeNode.id === edge.from || activeNode.id === edge.to);
+                                            return (
+                                                <g key={key}>
+                                                    <path d={`M ${startX} ${startY} C ${startX} ${(startY+endY)/2}, ${endX} ${(startY+endY)/2}, ${endX} ${endY}`} 
+                                                          fill="none" stroke={active ? "#818cf8" : "rgba(71, 85, 105, 0.4)"} strokeWidth={active ? "3" : "2"} className={active ? "line-animated" : ""} />
+                                                    {edge.label && <rect x={(startX+endX)/2 - 30} y={(startY+endY)/2 - 10} width="60" height="20" rx="4" fill="#0f172a" stroke="rgba(71, 85, 105, 0.5)" />}
+                                                    {edge.label && <text x={(startX+endX)/2} y={(startY+endY)/2 + 4} fill="#cbd5e1" fontSize="9" textAnchor="middle" className="font-mono">{edge.label}</text>}
+                                                    <circle cx={endX} cy={endY} r="4" fill={active ? "#818cf8" : "#475569"} />
+                                                </g>
+                                            );
+                                        })}
+                                    </svg>
+
+                                    {data.nodes.map(node => (
+                                        <NodeBlock
+                                            key={node.id}
+                                            node={node}
+                                            active={activeNode?.id === node.id}
+                                            dragging={draggingNodeId === node.id}
+                                            theme={nodeThemes[node.type] || nodeThemes['function']}
+                                            onNodeMouseDown={handleNodeClick}
+                                            registerRef={registerRef}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 glass border border-slate-700/50 rounded-full p-2 flex items-center space-x-4 shadow-2xl z-20">
+                                <button onClick={() => { setIsPlaying(false); setSimStep(prev => Math.max(0, prev - 1)); }} className="p-2 hover:bg-slate-800 rounded-full text-slate-300 transition" disabled={!data.flow?.length}><Icons.SkipBack /></button>
+                                <button onClick={() => setIsPlaying(!isPlaying)} disabled={!data.flow?.length} className="p-3 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:hover:bg-indigo-500 rounded-full text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] transition transform hover:scale-105">
+                                    {isPlaying ? <Icons.Pause /> : <Icons.Play />}
+                                </button>
+                                <button onClick={() => { setIsPlaying(false); setSimStep(prev => Math.min(data.flow.length - 1, prev + 1)); }} className="p-2 hover:bg-slate-800 rounded-full text-slate-300 transition" disabled={!data.flow?.length}><Icons.SkipForward /></button>
+                            </div>
+                        </div>
+
+                        <div className="resizable-panel flex flex-col glass-panel rounded-2xl overflow-hidden shadow-xl w-[25%] shrink-0" style={{direction: 'rtl'}}>
+                            <div style={{direction: 'ltr'}} className="h-full flex flex-col">
+                                <div className="px-4 py-3 border-b border-slate-800/50 flex items-center space-x-2 bg-slate-900/50 text-slate-300 shrink-0">
+                                    <Icons.Activity />
+                                    <h2 className="text-sm font-semibold truncate">Trazabilidad</h2>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-5 text-sm no-scrollbar">
+                                    {activeNode ? (
+                                        <div className="space-y-5">
+                                            {activeFlowExplanation && (
+                                                <div className="p-4 rounded-xl border border-indigo-500/50 bg-indigo-950/30 shadow-[0_0_15px_rgba(99,102,241,0.1)] relative overflow-hidden">
+                                                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400">Paso ({simStep + 1}/{data.flow.length})</span>
+                                                        <span className="flex h-2 w-2 relative">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-indigo-100 text-sm leading-relaxed">{activeFlowExplanation}</p>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="p-4 rounded-xl border bg-gradient-to-br from-slate-900 to-slate-800"
+                                                 style={{ borderColor: (nodeThemes[activeNode.type] || nodeThemes['function']).border }}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Bloque Inspeccionado</span>
+                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900/50 border"
+                                                          style={{ borderColor: (nodeThemes[activeNode.type] || nodeThemes['function']).border, color: (nodeThemes[activeNode.type] || nodeThemes['function']).text }}>
+                                                        {(NODE_TYPES[activeNode.type] || NODE_TYPES['function']).label}
+                                                    </span>
+                                                </div>
+                                                <div className="font-mono font-bold text-lg break-all leading-tight"
+                                                     style={{ color: (nodeThemes[activeNode.type] || nodeThemes['function']).text }}>{activeNode.label}</div>
+                                            </div>
+                                            
+                                            <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="text-slate-400"><Icons.Code /></div>
+                                                    <span className="text-xs text-slate-400">Archivo:</span>
+                                                </div>
+                                                <span className="font-mono text-xs text-slate-300 font-semibold bg-slate-900 px-2 py-1 rounded border border-slate-700/50 truncate max-w-[120px]" title={activeNode.file}>{activeNode.file || 'Desconocido'}</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="text-xs font-semibold text-slate-400">Propósito</div>
+                                                <p className="text-slate-300 leading-relaxed bg-slate-800/30 p-3 rounded-lg border border-slate-800 text-xs">{activeNode.purpose}</p>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-800">
+                                                    <div className="text-[10px] uppercase text-slate-500 mb-1">Entradas</div>
+                                                    <div className="font-mono text-xs text-blue-300">{activeNode.inputs}</div>
+                                                </div>
+                                                <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-800">
+                                                    <div className="text-[10px] uppercase text-slate-500 mb-1">Salidas</div>
+                                                    <div className="font-mono text-xs text-emerald-300">{activeNode.outputs}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4 opacity-60">
+                                            <Icons.Activity />
+                                            <p className="text-center px-4 text-xs">Usa el simulador inferior para recorrer el orden lógico o selecciona un bloque.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
